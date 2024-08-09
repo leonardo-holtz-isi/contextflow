@@ -5,7 +5,7 @@ __all__ = ['get_args']
 
 def get_args():
     parser = argparse.ArgumentParser(description='ContextFlow++')
-    parser.add_argument('--dataset', default='mnist', type=str, choices={'mnist', 'cifar10', 'atm', 'msl', 'smd', 'smap'}, help='dataset name (default: mnist)')
+    parser.add_argument('--dataset', default='mnist', type=str, choices={'mnist', 'cifar10', 'atm', 'msl', 'smd', 'smap', 'relay'}, help='dataset name (default: mnist)')
     parser.add_argument('--supervision', default='full', type=str, metavar='D', help='full/weak/subs (default: full)')
     parser.add_argument('--batch-size', '-bs', default=256, type=int, metavar='B', help='train batch size (default: 256)')
     parser.add_argument('--lr', type=float, default=1e-3, metavar='LR', help='learning rate (default: 1e-3)')
@@ -14,7 +14,7 @@ def get_args():
     parser.add_argument('--gpu', default='0', type=str, metavar='G', help='GPU device number')
     parser.add_argument('--coupling', default='eye', type=str, choices={'eye', 'conv', 'trans', 'maf'}, help='coupling blocks: conv/trans/eye (default: conv)')
     parser.add_argument('--dist', default='gauss', type=str, choices={'gauss', 'tdist'}, help='base distribution: gauss/tdist (default: gauss)')
-    parser.add_argument('--action-type', default='train-generalist', type=str, choices={'train-specialist', 'train-generalist', 'test-specialist', 'test-generalist'}, help='mode (default: train-generalist)')
+    parser.add_argument('--action-type', default='train-generalist', type=str, choices={'train-specialist', 'train-generalist', 'test-specialist', 'test-generalist', 'predict-anomalies'}, help='mode (default: train-generalist)')
     parser.add_argument('--enc-type', default='uniform', type=str, choices={'probsample', 'eyesample', 'uniform', 'vardeq', 'argmax'}, help='mode (default: uniform)')
     parser.add_argument('--enc-emb', default='onehot', type=str, choices={'eye', 'onehot', 'embed'}, help='mode (default: onehot)')
     parser.add_argument('--contextflow', action='store_true', default=False, help='enables ContextFlow++')

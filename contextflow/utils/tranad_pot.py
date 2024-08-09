@@ -88,6 +88,9 @@ def adjust_predicts(score, label,
     else:
         return predict
 
+def get_anomalies(score, threshold):
+    return score > threshold
+
 
 def calc_seq(score, label, threshold, calc_latency=False):
     """

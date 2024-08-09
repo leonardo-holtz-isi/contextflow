@@ -144,7 +144,10 @@ def load_data_ts(c, context=0, contexts=0):
         pp = preprocessor()
         data_dict = pp.normalize(data_dict, method=c.preprocessing)
         # sliding windows
-        window_dict = generate_windows(data_dict, window_size=c.window_length, stride=1)
+        if c.dataset == 'relay':
+            window_dict = generate_windows(data_dict, window_size=c.window_length, stride=c.window_length // 2)
+        else:
+            window_dict = generate_windows(data_dict, window_size=c.window_length, stride=1)
         # batch data
         train_dataset = sliding_window_dataset(c, window_dict, train=True,  context=train_context, contexts=contexts)
         valid_dataset = sliding_window_dataset(c, window_dict, train=False, context=test_context , contexts=contexts)

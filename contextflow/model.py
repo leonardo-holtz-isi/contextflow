@@ -111,7 +111,10 @@ def create_model(config, data_size=(1, 1, 1), mixtures=1, contexts=[-1]):
     #
     sz = data_size
     ts_dataset = True if c.dataset in ['atm', 'msl', 'smd', 'smap'] else False
+    
+    # Defines the pooling, kernel size and padding. Time series data are 1D.
     p, krn, pad = ((2,1), (3,1), (1,0)) if ts_dataset else ((2,2), (3,3), (1,1))
+    
     components = 8  # number of components in the GMM
     # context
     mode = 'eye' if generalist else 'ours'
@@ -196,7 +199,7 @@ def main(c):
         contexts = [68]  # discrete contexts
         data_vars = (26, 6+6)  # (continuous, discrete+zero)
         mixtures = 2
-    elif c.dataset in ['msl', 'smd', 'smap']:
+    elif c.dataset in ['msl', 'smd', 'smap', 'relay']:
         # debug:
         #mixtures = 2
         #c.supervision = 'full'
@@ -218,9 +221,13 @@ def main(c):
         elif c.dataset == 'smap':
             contexts = [55]  # discrete contexts
             data_vars = (25, 0)
+        elif c.dataset == 'relay':
+            contexts = [0] # TODO
+            data_vars = (1, 0) # TODO
+            window_length = 12
             
     else: raise NotImplementedError('{} is not supported dataset!'.format(c.dataset))
-    ad_dataset = True if c.dataset in ['atm', 'msl', 'smd', 'smap'] else False
+    ad_dataset = True if c.dataset in ['atm', 'msl', 'smd', 'smap', 'relay'] else False
     # upd config:
     if generalist:
         context = [-1] if c.clean else contexts
@@ -298,7 +305,7 @@ def main(c):
     #
     if checkpoint:
         experiment.load(checkpoint)
-    elif c.action_type in ['test-specialist', 'test-generalist'] and os.path.isfile(checkpoint_path):
+    elif c.action_type in ['test-specialist', 'test-generalist', 'predict-anomalies'] and os.path.isfile(checkpoint_path):
         print(config['checkpoint_path'])
         experiment.load(config['checkpoint_path'])
     elif c.action_type == 'train-specialist' and c.contextflow and os.path.isfile(generalist_path):
@@ -311,60 +318,14 @@ def main(c):
         experiment.config['epochs'] = 1
         experiment.run()
         print(experiment.summary)
-    #if c.action_type in ['test-specialist', 'test-generalist']:
-    #    mf1, mauc, mpr, mrec, cnt = 0.0, 0.0, 0.0, 0.0, 0.0
-    #    for cur_context in range(contexts[0]):
-    #        #print(cur_context, contexts)
-    #        #print(mtad_entities[c.dataset])
-    #        (train_loader, valid_loader), (train_weight, _) = load_data_ts(c, context=[cur_context], contexts=contexts)
-    #        _, _            , train_sc_list, train_id_list = experiment.eval_epoch(train_loader, 0, split='Train')
-    #        _, valid_gt_list, valid_sc_list, valid_id_list = experiment.eval_epoch(valid_loader, 0, split='Val')
-    #        train_ad_score = np.asarray(train_sc_list, dtype=float)
-    #        valid_ad_score = np.asarray(valid_sc_list, dtype=float)
-    #        valid_gt_label = np.asarray(valid_gt_list, dtype=int)
-    #        #print(train_ad_score.shape, valid_ad_score.shape, valid_gt_label.shape)
-    #        result, _ = pot_eval(c.dataset, train_ad_score, valid_ad_score, valid_gt_label)
-    #        #print(result)
-    #        f1  = 1e2*result['f1']
-    #        auc = 1e2*result['ROC/AUC']
-    #        pr  = 1e2*result['precision']
-    #        rec = 1e2*result['recall']
-    #        mf1 += f1
-    #        mauc+= auc
-    #        mpr += pr
-    #        mrec+= rec
-    #        cnt += 1
-    #        print('{} Test P/R/AUC/F1 {:.1f}/{:.1f}/{:.1f}/{:.1f}'.format(mtad_entities[c.dataset][cur_context], pr, rec, auc, f1))
-    #    print('MEAN Test P/R/AUC/F1 {:.1f}/{:.1f}/{:.1f}/{:.1f}'.format(mpr/cnt, mrec/cnt, mauc/cnt, mf1/cnt))
-#
-        #valid_loss, valid_gt_list, valid_sc_list, valid_id_list = experiment.eval_epoch(test_loader, 0, split='Val')
-        ## score aggregation
-        #gt_score = np.asarray(valid_gt_list, dtype=float)
-        #ad_score = np.asarray(valid_sc_list, dtype=float)
-        #precision, recall, thresholds = precision_recall_curve(gt_score, ad_score)
-        #a = 2 * precision * recall
-        #b = precision + recall
-        #f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
-        #threshold = thresholds[np.argmax(f1)]
-        #threshold = min(threshold, 0.999)
-        #gt_label = np.asarray(valid_gt_list, dtype=int)
-        #ad_label = (ad_score > threshold).astype(int)
-        #print('Optimal Threshold: {:.8f} with ad_score mean = {:.8f}'.format(threshold, np.mean(ad_score)))
-        ## sklearn:
-        #ac = 1e2*accuracy_score(         gt_label, ad_label)
-        #f1 = 1e2*f1_score(               gt_label, ad_label)
-        #auc= 1e2*auroc(                  ad_score, gt_score)
-        #print('Test acc/auc/f1 {:.1f}/{:.1f}/{:.1f}'.format(ac, f1, auc))
-        #print(experiment.summary)
     
-        #test_loss, test_gt_list, test_sc_list, test_id_list = experiment.eval_epoch(test_loader, 0, split='Val')
-        #for c1 in range(contexts[0]):
-        #    for c2 in range(contexts[1]):
-        #        eval_context = [c1, c2]
-        #        train_loader, valid_loader, test_loader = load_data_cifar10(c, eval_context=eval_context, contexts=contexts)
-        #        test_loss, test_gt_list, test_sc_list, test_id_list = experiment.eval_epoch(test_loader, 0, split='Val')
-        #        test_acc = 1e2*accuracy_score(np.asarray(test_gt_list), np.asarray(test_sc_list))
-        #        print('Test acc/loss {:.1f}/{:.2f} for {} context'.format(test_acc, test_loss, eval_context))
+    elif c.action_type in ['predict-anomalies']:
+        results, gt = experiment.predict_unsupervised()
+        print("==== RESULTS ====")
+        print(results.shape)
+        print(results)
+        # Need to use the pot_eval method as well
+        
     elif c.action_type in ['train-specialist', 'train-generalist']:
         experiment.run()
         print(experiment.summary)

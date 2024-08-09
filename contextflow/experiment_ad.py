@@ -69,7 +69,7 @@ class AdExperiment:
                 self.scheduler.step()
             
             if e % self.config['eval_epochs'] == self.config['eval_epochs']-1:
-                valid_loss, valid_gt_list, valid_sc_list, valid_id_list = self.eval_epoch(self.valid_loader, e, split='Val')
+                valid_loss, valid_gt_list, valid_sc_list, valid_id_list = self.eval_epoch(self.valid_loader)
                 valid_gt_label = np.asarray(valid_gt_list, dtype=int)
                 valid_gt_score = np.asarray(valid_gt_list, dtype=float)
                 valid_ad_score = np.asarray(valid_sc_list, dtype=float)
@@ -120,7 +120,7 @@ class AdExperiment:
                         # checkpoint model
                         if self.config['save_checkpoint']: self.save()
                 else:  # msl, smd, smap
-                    train_loss, train_gt_list, train_sc_list, train_id_list = self.eval_epoch(self.train_loader, e, split='Train')
+                    train_loss, train_gt_list, train_sc_list, train_id_list = self.eval_epoch(self.train_loader)
                     train_ad_score = np.asarray(train_sc_list, dtype=float)
                     train_id_label = np.asarray(train_id_list, dtype=int)
                     if 1:  #self.generalist:
@@ -159,6 +159,10 @@ class AdExperiment:
                         plt.plot(t, valid_gt_label, 'r--', t, valid_ad_score, 'g-', t, threshold*np.ones_like(valid_ad_score))
                         plt.show()
 
+    def predict_unsupervised(self):
+        train_loss, train_gt_list, train_sc_list, train_id_list = self.eval_epoch(self.train_loader)
+        return np.array(train_sc_list), np.array(train_gt_list)
+    
     def log(self, name, val):
         if self.verbose:
             if (isinstance(val, str) or isinstance(val, int)): print("{}: {}".format(name, val))
@@ -203,14 +207,19 @@ class AdExperiment:
             # model:
             logp = self.dim_inv*self.model.log_prob(x, context=context)
             logp[logp != logp] = 0.0  # replace NaN's with 0
-            # loss:
+            
+            # Unsupervised loss:
             cost_uns =-self.alpha*log_theta(torch.logsumexp(logp, -1)).mean() if self.criterion else -self.alpha*log_theta(logp).mean()
+            
+            # Supervised loss:
             if self.criterion: cost_sup = self.criterion(logp, gt)
             else: cost_sup = torch.zeros_like(cost_uns)
+            
             cost_sum = cost_sup + cost_uns
             cost_sum.backward()
             if self.config['grad_clip_norm'] is not None: nn.utils.clip_grad_norm_(self.model.parameters(), self.config['grad_clip_norm'])
             self.optimizer.step()
+            
             # latency:
             if self.config['log_timing']:
                 end.record()
@@ -236,7 +245,7 @@ class AdExperiment:
         print('Epoch: {:d} train loss: {:.4f}={:.4f}+{:.4f}, lr={:.6f}'.format(epoch, mean_loss_sum, mean_loss_sup, mean_loss_uns, lr))
         return mean_loss_sum
 
-    def eval_epoch(self, loader, epoch, split='Val'):
+    def eval_epoch(self, loader):
         gt_list = list()
         sc_list = list()
         id_list = list()
@@ -266,10 +275,14 @@ class AdExperiment:
                     end.record()
                     torch.cuda.synchronize()
                     batch_durations.append(start.elapsed_time(end))
-                # loss:
+                    
+                # Unsupervised loss:
                 cost_uns =-self.alpha*log_theta(torch.logsumexp(logp, -1)).mean() if self.criterion else -self.alpha*log_theta(logp).mean()
+                
+                # Supervised loss:
                 if self.criterion: cost_sup = self.criterion(logp, gt)
                 else: cost_sup = torch.zeros_like(cost_uns)
+                
                 cost_sum = cost_sup + cost_uns
                 loss_sup += cost_sup.item()
                 loss_uns += cost_uns.item()
